@@ -31,7 +31,7 @@ import threading
 import uuid
 from pathlib import Path
 
-from anthropic import Anthropic
+from qwen_anthropic_compat import Anthropic
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -41,7 +41,7 @@ if os.getenv("ANTHROPIC_BASE_URL"):
 
 WORKDIR = Path.cwd()
 client = Anthropic(base_url=os.getenv("ANTHROPIC_BASE_URL"))
-MODEL = os.environ["MODEL_ID"]
+MODEL = os.getenv("MODEL_ID", "qwen3.5-plus")
 
 SYSTEM = f"You are a coding agent at {WORKDIR}. Use background_run for long-running commands."
 
