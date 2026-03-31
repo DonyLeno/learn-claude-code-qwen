@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import json
 import os
+import socket
+import ssl
+import time
 import urllib.error
 import urllib.request
 from types import SimpleNamespace
@@ -39,21 +42,43 @@ class _MessagesAPI:
         for k in ("temperature", "top_p", "stream"):
             if k in kwargs:
                 payload[k] = kwargs[k]
-        req = urllib.request.Request(
-            f"{self.outer.base_url}/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.outer.api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            detail = e.read().decode("utf-8", errors="ignore")
-            raise RuntimeError(f"Qwen API HTTP {e.code}: {detail}") from e
+        request_url = f"{self.outer.base_url}/chat/completions"
+        request_data = json.dumps(payload).encode("utf-8")
+        headers = {
+            "Authorization": f"Bearer {self.outer.api_key}",
+            "Content-Type": "application/json",
+        }
+        max_attempts = max(1, int(os.getenv("QWEN_MAX_ATTEMPTS", "4")))
+        base_delay = float(os.getenv("QWEN_RETRY_BASE_DELAY", "0.8"))
+        retryable_http = {408, 429, 500, 502, 503, 504}
+        last_error = None
+        for attempt in range(1, max_attempts + 1):
+            req = urllib.request.Request(
+                request_url,
+                data=request_data,
+                headers=headers,
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    last_error = None
+                    break
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode("utf-8", errors="ignore")
+                if e.code in retryable_http and attempt < max_attempts:
+                    last_error = RuntimeError(f"Qwen API HTTP {e.code}: {detail}")
+                    time.sleep(base_delay * (2 ** (attempt - 1)))
+                    continue
+                raise RuntimeError(f"Qwen API HTTP {e.code}: {detail}") from e
+            except (urllib.error.URLError, ssl.SSLError, socket.timeout, TimeoutError, ConnectionResetError, OSError) as e:
+                last_error = e
+                if attempt < max_attempts:
+                    time.sleep(base_delay * (2 ** (attempt - 1)))
+                    continue
+                raise RuntimeError(f"Qwen API network error after {max_attempts} attempts: {e}") from e
+        if last_error is not None:
+            raise RuntimeError(f"Qwen API network error after {max_attempts} attempts: {last_error}")
         msg = data["choices"][0]["message"]
         content_blocks = []
         if msg.get("content"):
