@@ -1,5 +1,5 @@
 export const VERSION_ORDER = [
-  "s01", "s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12"
+  "s01", "s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12", "s_full"
 ] as const;
 
 export const LEARNING_PATH = VERSION_ORDER;
@@ -26,6 +26,7 @@ export const VERSION_META: Record<string, {
   s10: { title: "Team Protocols", subtitle: "Shared Communication Rules", coreAddition: "request_id correlation for two protocols", keyInsight: "One request-response pattern drives all team negotiation", layer: "collaboration", prevVersion: "s09" },
   s11: { title: "Autonomous Agents", subtitle: "Scan Board, Claim Tasks", coreAddition: "Task board polling + timeout-based self-governance", keyInsight: "Teammates scan the board and claim tasks themselves; no need for the lead to assign each one", layer: "collaboration", prevVersion: "s10" },
   s12: { title: "Worktree + Task Isolation", subtitle: "Isolate by Directory", coreAddition: "Composable worktree lifecycle + event stream over a shared task board", keyInsight: "Each works in its own directory; tasks manage goals, worktrees manage directories, bound by ID", layer: "collaboration", prevVersion: "s11" },
+  s_full: { title: "Full Agent", subtitle: "Integrated Reference", coreAddition: "End-to-end integration of all layers", keyInsight: "A complete agent composition that combines tools, planning, memory, and collaboration", layer: "collaboration", prevVersion: "s12" },
 };
 
 export const LAYERS = [
@@ -33,5 +34,5 @@ export const LAYERS = [
   { id: "planning" as const, label: "Planning & Coordination", color: "#10B981", versions: ["s03", "s04", "s05", "s07"] },
   { id: "memory" as const, label: "Memory Management", color: "#8B5CF6", versions: ["s06"] },
   { id: "concurrency" as const, label: "Concurrency", color: "#F59E0B", versions: ["s08"] },
-  { id: "collaboration" as const, label: "Collaboration", color: "#EF4444", versions: ["s09", "s10", "s11", "s12"] },
+  { id: "collaboration" as const, label: "Collaboration", color: "#EF4444", versions: ["s09", "s10", "s11", "s12", "s_full"] },
 ] as const;

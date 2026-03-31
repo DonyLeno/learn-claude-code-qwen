@@ -10,14 +10,14 @@
     },
     {
       "type": "tool_call",
-      "content": "[\n  { \"id\": 1, \"task\": \"Create calc.py with argument parsing\", \"status\": \"in_progress\" },\n  { \"id\": 2, \"task\": \"Implement 4 operations\", \"status\": \"pending\" },\n  { \"id\": 3, \"task\": \"Add error handling\", \"status\": \"pending\" },\n  { \"id\": 4, \"task\": \"Test all operations\", \"status\": \"pending\" }\n]",
-      "toolName": "todo_write",
+      "content": "{\"items\": [{\"id\": \"1\", \"text\": \"Create calc.py with argument parsing\", \"status\": \"in_progress\"}, {\"id\": \"2\", \"text\": \"Implement 4 operations\", \"status\": \"pending\"}, {\"id\": \"3\", \"text\": \"Add error handling\", \"status\": \"pending\"}, {\"id\": \"4\", \"text\": \"Test all operations\", \"status\": \"pending\"}]}",
+      "toolName": "todo",
       "annotation": "TodoManager creates a visible plan BEFORE any code is written"
     },
     {
       "type": "tool_result",
-      "content": "Todo list created with 4 tasks",
-      "toolName": "todo_write",
+      "content": "[>] #1: Create calc.py with argument parsing\n[ ] #2: Implement 4 operations\n[ ] #3: Add error handling\n[ ] #4: Test all operations\n\n(0/4 completed)",
+      "toolName": "todo",
       "annotation": "The plan is now visible and trackable"
     },
     {

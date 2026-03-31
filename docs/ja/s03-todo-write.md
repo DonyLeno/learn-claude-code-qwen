@@ -34,20 +34,31 @@
 
 ## 仕組み
 
-1. TodoManagerはアイテムのリストをステータス付きで保持する。`in_progress`にできるのは同時に1つだけ。
+1. TodoManagerはステータス付き項目を保持し、件数・フィールド・ステータス値を検証する。`in_progress`にできるのは同時に1つだけ。
 
 ```python
 class TodoManager:
+    def __init__(self):
+        self.items = []
+
     def update(self, items: list) -> str:
-        validated, in_progress_count = [], 0
-        for item in items:
-            status = item.get("status", "pending")
+        if len(items) > 20:
+            raise ValueError("Max 20 todos allowed")
+        validated = []
+        in_progress_count = 0
+        for i, item in enumerate(items):
+            text = str(item.get("text", "")).strip()
+            status = str(item.get("status", "pending")).lower()
+            item_id = str(item.get("id", str(i + 1)))
+            if not text:
+                raise ValueError(f"Item {item_id}: text required")
+            if status not in ("pending", "in_progress", "completed"):
+                raise ValueError(f"Item {item_id}: invalid status '{status}'")
             if status == "in_progress":
                 in_progress_count += 1
-            validated.append({"id": item["id"], "text": item["text"],
-                              "status": status})
+            validated.append({"id": item_id, "text": text, "status": status})
         if in_progress_count > 1:
-            raise ValueError("Only one task can be in_progress")
+            raise ValueError("Only one task can be in_progress at a time")
         self.items = validated
         return self.render()
 ```
@@ -64,13 +75,13 @@ TOOL_HANDLERS = {
 3. nagリマインダーが、モデルが3ラウンド以上`todo`を呼ばなかった場合にナッジを注入する。
 
 ```python
-if rounds_since_todo >= 3 and messages:
-    last = messages[-1]
-    if last["role"] == "user" and isinstance(last.get("content"), list):
-        last["content"].insert(0, {
-            "type": "text",
-            "text": "<reminder>Update your todos.</reminder>",
-        })
+rounds_since_todo = 0 if used_todo else rounds_since_todo + 1
+if rounds_since_todo >= 3:
+    results.append({
+        "type": "text",
+        "text": "<reminder>Update your todos.</reminder>",
+    })
+messages.append({"role": "user", "content": results})
 ```
 
 「一度にin_progressは1つだけ」の制約が逐次的な集中を強制し、nagリマインダーが説明責任を生む。

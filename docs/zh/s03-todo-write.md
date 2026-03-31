@@ -34,20 +34,31 @@
 
 ## 工作原理
 
-1. TodoManager 存储带状态的项目。同一时间只允许一个 `in_progress`。
+1. TodoManager 存储带状态的项目，并校验数量、字段和状态合法性；同一时间只允许一个 `in_progress`。
 
 ```python
 class TodoManager:
+    def __init__(self):
+        self.items = []
+
     def update(self, items: list) -> str:
-        validated, in_progress_count = [], 0
-        for item in items:
-            status = item.get("status", "pending")
+        if len(items) > 20:
+            raise ValueError("Max 20 todos allowed")
+        validated = []
+        in_progress_count = 0
+        for i, item in enumerate(items):
+            text = str(item.get("text", "")).strip()
+            status = str(item.get("status", "pending")).lower()
+            item_id = str(item.get("id", str(i + 1)))
+            if not text:
+                raise ValueError(f"Item {item_id}: text required")
+            if status not in ("pending", "in_progress", "completed"):
+                raise ValueError(f"Item {item_id}: invalid status '{status}'")
             if status == "in_progress":
                 in_progress_count += 1
-            validated.append({"id": item["id"], "text": item["text"],
-                              "status": status})
+            validated.append({"id": item_id, "text": text, "status": status})
         if in_progress_count > 1:
-            raise ValueError("Only one task can be in_progress")
+            raise ValueError("Only one task can be in_progress at a time")
         self.items = validated
         return self.render()
 ```
@@ -64,13 +75,13 @@ TOOL_HANDLERS = {
 3. nag reminder: 模型连续 3 轮以上不调用 `todo` 时注入提醒。
 
 ```python
-if rounds_since_todo >= 3 and messages:
-    last = messages[-1]
-    if last["role"] == "user" and isinstance(last.get("content"), list):
-        last["content"].insert(0, {
-            "type": "text",
-            "text": "<reminder>Update your todos.</reminder>",
-        })
+rounds_since_todo = 0 if used_todo else rounds_since_todo + 1
+if rounds_since_todo >= 3:
+    results.append({
+        "type": "text",
+        "text": "<reminder>Update your todos.</reminder>",
+    })
+messages.append({"role": "user", "content": results})
 ```
 
 "同时只能有一个 in_progress" 强制顺序聚焦。nag reminder 制造问责压力 -- 你不更新计划, 系统就追着你问。

@@ -21,7 +21,7 @@ const OUT_DIR = path.join(WEB_DIR, "src", "data", "generated");
 // s_full.py -> s_full (reference agent, typically skipped)
 function filenameToVersionId(filename: string): string | null {
   const base = path.basename(filename, ".py");
-  if (base === "s_full") return null;
+  if (base === "s_full") return "s_full";
   if (base === "__init__") return null;
 
   const match = base.match(/^(s\d+[a-c]?)_/);
@@ -111,8 +111,143 @@ function detectLocale(relPath: string): "en" | "zh" | "ja" {
 
 // Extract version from doc filename (e.g., "s01-the-agent-loop.md" -> "s01")
 function extractDocVersion(filename: string): string | null {
-  const m = filename.match(/^(s\d+[a-c]?)-/);
+  const m = filename.match(/^(s\d+[a-c]?|s_full)-/);
   return m ? m[1] : null;
+}
+
+function extractTopLevelBlock(lines: string[], startIndex: number): string {
+  let end = lines.length;
+  for (let i = startIndex + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    if (!line.startsWith(" ") && !line.startsWith("\t")) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(startIndex, end).join("\n").trimEnd();
+}
+
+function extractAssignmentBlock(lines: string[], varName: string): string | null {
+  const start = lines.findIndex((line) =>
+    new RegExp(`^${varName}\\s*=`).test(line)
+  );
+  if (start < 0) return null;
+  let balance = 0;
+  let seen = false;
+  for (let i = start; i < lines.length; i++) {
+    for (const ch of lines[i]) {
+      if (ch === "{" || ch === "[") {
+        balance += 1;
+        seen = true;
+      } else if (ch === "}" || ch === "]") {
+        balance -= 1;
+      }
+    }
+    if (seen && balance <= 0) {
+      return lines.slice(start, i + 1).join("\n").trimEnd();
+    }
+  }
+  return null;
+}
+
+function extractAround(
+  lines: string[],
+  needle: string,
+  before: number,
+  after: number
+): string | null {
+  const idx = lines.findIndex((line) => line.includes(needle));
+  if (idx < 0) return null;
+  const start = Math.max(0, idx - before);
+  const end = Math.min(lines.length, idx + after + 1);
+  return lines.slice(start, end).join("\n").trimEnd();
+}
+
+function collectTopLevelBlocks(lines: string[]): string[] {
+  const starts: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^(class|def)\s+/.test(line)) starts.push(i);
+    if (/^(TOOLS|TOOL_HANDLERS|CHILD_TOOLS|PARENT_TOOLS)\s*=/.test(line)) starts.push(i);
+  }
+  return starts.map((i) => extractTopLevelBlock(lines, i));
+}
+
+function pickBestMatchingBlock(block: string, lines: string[]): string | null {
+  const candidates = collectTopLevelBlocks(lines);
+  if (!candidates.length) return null;
+  const tokens = Array.from(
+    new Set((block.match(/[A-Za-z_]\w+/g) ?? []).filter((w) => w.length >= 4))
+  );
+  if (!tokens.length) return null;
+  let best: string | null = null;
+  let bestScore = 0;
+  for (const candidate of candidates) {
+    let score = 0;
+    for (const t of tokens) {
+      if (candidate.includes(t)) score += 1;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
+  }
+  return bestScore > 0 ? best : null;
+}
+
+function syncPythonFence(block: string, source: string): string {
+  const lines = source.split("\n");
+  const classMatch = block.match(/class\s+([A-Za-z_]\w*)/);
+  if (classMatch) {
+    const i = lines.findIndex((line) => line.match(new RegExp(`^class\\s+${classMatch[1]}\\b`)));
+    if (i >= 0) return extractTopLevelBlock(lines, i);
+  }
+  const funcMatch = block.match(/def\s+([A-Za-z_]\w*)\(/);
+  if (funcMatch) {
+    const i = lines.findIndex((line) => line.match(new RegExp(`^def\\s+${funcMatch[1]}\\(`)));
+    if (i >= 0) return extractTopLevelBlock(lines, i);
+  }
+  if (block.includes("TOOL_HANDLERS")) {
+    const snippet = extractAssignmentBlock(lines, "TOOL_HANDLERS");
+    if (snippet) return snippet;
+  }
+  if (block.includes("TOOLS =")) {
+    const snippet = extractAssignmentBlock(lines, "TOOLS");
+    if (snippet) return snippet;
+  }
+  if (block.includes("PARENT_TOOLS")) {
+    const snippet = extractAssignmentBlock(lines, "PARENT_TOOLS");
+    if (snippet) return snippet;
+  }
+  if (block.includes("CHILD_TOOLS")) {
+    const snippet = extractAssignmentBlock(lines, "CHILD_TOOLS");
+    if (snippet) return snippet;
+  }
+  if (block.includes("rounds_since_todo")) {
+    const idx = lines.findIndex((line) => line.includes("rounds_since_todo = 0 if used_todo"));
+    if (idx >= 0) {
+      const end = lines.findIndex(
+        (line, i) => i > idx && line.includes('messages.append({"role": "user", "content": results})')
+      );
+      if (end >= idx) return lines.slice(idx, end + 1).join("\n").trimEnd();
+    }
+  }
+  if (block.includes("client.messages.create")) {
+    const snippet = extractAround(lines, "response = client.messages.create(", 2, 4);
+    if (snippet) return snippet;
+  }
+  const best = pickBestMatchingBlock(block, lines);
+  if (best) return best;
+  return block.trimEnd();
+}
+
+function syncDocCodeBlocks(content: string, source: string | undefined): string {
+  if (!source) return content;
+  return content.replace(/```python\n([\s\S]*?)```/g, (_m, code) => {
+    const synced = syncPythonFence(code, source);
+    return `\`\`\`python\n${synced}\n\`\`\``;
+  });
 }
 
 // Main extraction
@@ -240,12 +375,13 @@ function main() {
         }
 
         const filePath = path.join(localeDir, filename);
-        const content = fs.readFileSync(filePath, "utf-8");
+        const rawContent = fs.readFileSync(filePath, "utf-8");
+        const syncedContent = syncDocCodeBlocks(rawContent, versionMap.get(version)?.source);
 
-        const titleMatch = content.match(/^#\s+(.+)$/m);
+        const titleMatch = syncedContent.match(/^#\s+(.+)$/m);
         const title = titleMatch ? titleMatch[1] : filename;
 
-        docs.push({ version, locale: locale as "en" | "zh" | "ja", title, content });
+        docs.push({ version, locale: locale as "en" | "zh" | "ja", title, content: syncedContent });
       }
     }
 
