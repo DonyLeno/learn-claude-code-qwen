@@ -73,22 +73,17 @@ def main() -> int:
     load_dotenv(override=True)
     key = (
         os.getenv("QWEN_API_KEY")
-        or os.getenv("DASHSCOPE_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
         or ""
     )
     key_name = (
         "QWEN_API_KEY" if os.getenv("QWEN_API_KEY")
-        else "DASHSCOPE_API_KEY" if os.getenv("DASHSCOPE_API_KEY")
-        else "OPENAI_API_KEY" if os.getenv("OPENAI_API_KEY")
         else "NONE"
     )
     base_url = (
         os.getenv("QWEN_BASE_URL")
-        or os.getenv("OPENAI_BASE_URL")
         or "https://dashscope.aliyuncs.com/compatible-mode/v1"
     ).rstrip("/")
-    model = os.getenv("MODEL_ID", "qwen-plus")
+    model = os.getenv("MODEL_ID", "qwen3.5-plus")
 
     log("开始模型连通性测试")
     log("工作目录", os.getcwd())
@@ -98,7 +93,7 @@ def main() -> int:
     log("Base URL", base_url)
 
     if not key.strip():
-        log("失败", "未检测到可用密钥，请设置 QWEN_API_KEY 或 DASHSCOPE_API_KEY 或 OPENAI_API_KEY")
+        log("失败", "未检测到可用密钥，请设置 QWEN_API_KEY")
         return 2
 
     headers = {

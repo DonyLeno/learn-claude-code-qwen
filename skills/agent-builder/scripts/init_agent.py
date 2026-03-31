@@ -26,18 +26,18 @@ Core insight: One tool (bash) can do everything.
 Subagents via self-recursion: python {name}.py "subtask"
 """
 
-from anthropic import Anthropic
+from qwen_client import QwenClient
 from dotenv import load_dotenv
 import subprocess
 import os
 
 load_dotenv()
 
-client = Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY"),
-    base_url=os.getenv("ANTHROPIC_BASE_URL")
+client = QwenClient(
+    api_key=os.getenv("QWEN_API_KEY"),
+    base_url=os.getenv("QWEN_BASE_URL")
 )
-MODEL = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")
+MODEL = os.getenv("MODEL_NAME", "qwen3.5-plus")
 
 SYSTEM = """You are a coding agent. Use bash for everything:
 - Read: cat, grep, find, ls
@@ -85,7 +85,7 @@ Core insight: 4 tools cover 90% of coding tasks.
 The model IS the agent. Code just runs the loop.
 """
 
-from anthropic import Anthropic
+from qwen_client import QwenClient
 from dotenv import load_dotenv
 from pathlib import Path
 import subprocess
@@ -93,11 +93,11 @@ import os
 
 load_dotenv()
 
-client = Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY"),
-    base_url=os.getenv("ANTHROPIC_BASE_URL")
+client = QwenClient(
+    api_key=os.getenv("QWEN_API_KEY"),
+    base_url=os.getenv("QWEN_BASE_URL")
 )
-MODEL = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")
+MODEL = os.getenv("MODEL_NAME", "qwen3.5-plus")
 WORKDIR = Path.cwd()
 
 SYSTEM = f"""You are a coding agent at {{WORKDIR}}.
@@ -208,9 +208,136 @@ if __name__ == "__main__":
 }
 
 ENV_TEMPLATE = '''# API Configuration
-ANTHROPIC_API_KEY=sk-xxx
-ANTHROPIC_BASE_URL=https://api.anthropic.com
-MODEL_NAME=claude-sonnet-4-20250514
+QWEN_API_KEY=sk-xxx
+QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+MODEL_NAME=qwen3.5-plus
+'''
+
+QWEN_CLIENT_TEMPLATE = '''#!/usr/bin/env python3
+import json
+import os
+import urllib.error
+import urllib.request
+from types import SimpleNamespace
+
+
+class QwenClient:
+    def __init__(self, api_key=None, base_url=None):
+        self.api_key = api_key or os.getenv("QWEN_API_KEY") or ""
+        self.base_url = (base_url or os.getenv("QWEN_BASE_URL") or "https://dashscope.aliyuncs.com/compatible-mode/v1").rstrip("/")
+        self.messages = _MessagesAPI(self)
+
+
+class _MessagesAPI:
+    def __init__(self, outer):
+        self.outer = outer
+
+    def create(self, model, messages, system=None, tools=None, max_tokens=8000):
+        payload = {
+            "model": model,
+            "messages": _to_chat_messages(system=system, messages=messages),
+            "max_tokens": max_tokens,
+            "tools": _to_chat_tools(tools or []),
+            "tool_choice": "auto",
+        }
+        req = urllib.request.Request(
+            f"{self.outer.base_url}/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.outer.api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="ignore")
+            raise RuntimeError(f"Qwen API HTTP {e.code}: {detail}") from e
+        msg = data["choices"][0]["message"]
+        content_blocks = []
+        if msg.get("content"):
+            content_blocks.append(SimpleNamespace(type="text", text=msg["content"]))
+        for tc in msg.get("tool_calls") or []:
+            fn = tc.get("function", {})
+            args_text = fn.get("arguments", "{}")
+            try:
+                args = json.loads(args_text) if isinstance(args_text, str) else (args_text or {})
+            except json.JSONDecodeError:
+                args = {}
+            content_blocks.append(
+                SimpleNamespace(type="tool_use", id=tc.get("id", ""), name=fn.get("name", ""), input=args)
+            )
+        stop_reason = "tool_use" if (msg.get("tool_calls") or []) else "end_turn"
+        return SimpleNamespace(content=content_blocks, stop_reason=stop_reason, raw=data)
+
+
+def _to_chat_tools(tools):
+    result = []
+    for t in tools:
+        result.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": t.get("name", ""),
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema", {"type": "object", "properties": {}}),
+                },
+            }
+        )
+    return result
+
+
+def _assistant_blocks_to_message(content):
+    text_parts = []
+    tool_calls = []
+    for b in content:
+        if hasattr(b, "type") and b.type == "text":
+            text_parts.append(getattr(b, "text", ""))
+        elif hasattr(b, "type") and b.type == "tool_use":
+            tool_calls.append(
+                {
+                    "id": getattr(b, "id", ""),
+                    "type": "function",
+                    "function": {
+                        "name": getattr(b, "name", ""),
+                        "arguments": json.dumps(getattr(b, "input", {}), ensure_ascii=False),
+                    },
+                }
+            )
+    msg = {"role": "assistant", "content": "\\n".join([x for x in text_parts if x])}
+    if tool_calls:
+        msg["tool_calls"] = tool_calls
+    return msg
+
+
+def _tool_result_to_chat_messages(parts):
+    out = []
+    for p in parts:
+        if isinstance(p, dict) and p.get("type") == "tool_result":
+            out.append({"role": "tool", "tool_call_id": p.get("tool_use_id", ""), "content": str(p.get("content", ""))})
+        elif isinstance(p, dict) and p.get("type") == "text":
+            out.append({"role": "user", "content": str(p.get("text", ""))})
+    return out
+
+
+def _to_chat_messages(system, messages):
+    out = []
+    if system:
+        out.append({"role": "system", "content": str(system)})
+    for m in messages:
+        role = m.get("role")
+        content = m.get("content")
+        if isinstance(content, str):
+            out.append({"role": role, "content": content})
+        elif role == "assistant" and isinstance(content, list):
+            out.append(_assistant_blocks_to_message(content))
+        elif role == "user" and isinstance(content, list):
+            out.extend(_tool_result_to_chat_messages(content))
+        else:
+            out.append({"role": role, "content": str(content)})
+    return out
 '''
 
 
@@ -243,12 +370,17 @@ def create_agent(name: str, level: int, output_dir: Path):
     gitignore.write_text(".env\n__pycache__/\n*.pyc\n")
     print(f"Created: {gitignore}")
 
+    # Write qwen client helper
+    qwen_client_file = agent_dir / "qwen_client.py"
+    qwen_client_file.write_text(QWEN_CLIENT_TEMPLATE)
+    print(f"Created: {qwen_client_file}")
+
     print(f"\nAgent '{name}' created at {agent_dir}")
     print(f"\nNext steps:")
     print(f"  1. cd {agent_dir}")
     print(f"  2. cp .env.example .env")
     print(f"  3. Edit .env with your API key")
-    print(f"  4. pip install anthropic python-dotenv")
+    print(f"  4. pip install python-dotenv")
     print(f"  5. python {name}.py")
 
 

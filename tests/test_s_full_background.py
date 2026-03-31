@@ -12,17 +12,17 @@ MODULE_PATH = REPO_ROOT / "agents" / "s_full.py"
 
 
 def load_s_full_module(temp_cwd: Path):
-    fake_anthropic = types.ModuleType("anthropic")
+    fake_qwen_client = types.ModuleType("qwen_client")
 
-    class FakeAnthropic:
+    class FakeQwenClient:
         def __init__(self, *args, **kwargs):
             self.messages = types.SimpleNamespace(create=None)
 
     fake_dotenv = types.ModuleType("dotenv")
-    setattr(fake_anthropic, "Anthropic", FakeAnthropic)
+    setattr(fake_qwen_client, "QwenClient", FakeQwenClient)
     setattr(fake_dotenv, "load_dotenv", lambda override=True: None)
 
-    previous_anthropic = sys.modules.get("anthropic")
+    previous_qwen_client = sys.modules.get("qwen_client")
     previous_dotenv = sys.modules.get("dotenv")
     previous_cwd = Path.cwd()
     spec = importlib.util.spec_from_file_location("s_full_under_test", MODULE_PATH)
@@ -30,7 +30,7 @@ def load_s_full_module(temp_cwd: Path):
         raise RuntimeError(f"Unable to load {MODULE_PATH}")
     module = importlib.util.module_from_spec(spec)
 
-    sys.modules["anthropic"] = fake_anthropic
+    sys.modules["qwen_client"] = fake_qwen_client
     sys.modules["dotenv"] = fake_dotenv
     try:
         os.chdir(temp_cwd)
@@ -39,10 +39,10 @@ def load_s_full_module(temp_cwd: Path):
         return module
     finally:
         os.chdir(previous_cwd)
-        if previous_anthropic is None:
-            sys.modules.pop("anthropic", None)
+        if previous_qwen_client is None:
+            sys.modules.pop("qwen_client", None)
         else:
-            sys.modules["anthropic"] = previous_anthropic
+            sys.modules["qwen_client"] = previous_qwen_client
         if previous_dotenv is None:
             sys.modules.pop("dotenv", None)
         else:

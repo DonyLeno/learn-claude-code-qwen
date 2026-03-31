@@ -6,19 +6,23 @@ This is the simplest possible working agent (~80 lines).
 It has everything you need: 3 tools + loop.
 
 Usage:
-    1. Set ANTHROPIC_API_KEY environment variable
+    1. Set QWEN_API_KEY environment variable
     2. python minimal-agent.py
     3. Type commands, 'q' to quit
 """
 
-from anthropic import Anthropic
 from pathlib import Path
 import subprocess
 import os
 
+try:
+    from agents.qwen_client import QwenClient
+except ImportError:
+    from qwen_client import QwenClient
+
 # Configuration
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-MODEL = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")
+client = QwenClient(api_key=os.getenv("QWEN_API_KEY"))
+MODEL = os.getenv("MODEL_NAME", "qwen3.5-plus")
 WORKDIR = Path.cwd()
 
 # System prompt - keep it simple

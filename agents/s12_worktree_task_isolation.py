@@ -37,16 +37,13 @@ import subprocess
 import time
 from pathlib import Path
 
-from qwen_anthropic_compat import Anthropic
+from qwen_client import QwenClient
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-if os.getenv("ANTHROPIC_BASE_URL"):
-    os.environ.pop("ANTHROPIC_AUTH_TOKEN", None)
-
 WORKDIR = Path.cwd()
-client = Anthropic(base_url=os.getenv("ANTHROPIC_BASE_URL"))
+client = QwenClient(base_url=os.getenv("QWEN_BASE_URL"))
 MODEL = os.getenv("MODEL_ID", "qwen3.5-plus")
 
 

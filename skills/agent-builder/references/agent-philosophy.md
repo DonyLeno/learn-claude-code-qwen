@@ -16,7 +16,7 @@ The code is the harness. The model is the agent. These are not interchangeable. 
 
 An agent is a neural network -- a Transformer, an RNN, a learned function -- that has been trained, through billions of gradient updates on action-sequence data, to perceive an environment, reason about goals, and take actions to achieve them.
 
-A human is an agent: a biological neural network shaped by evolution. DeepMind's DQN is an agent: a convolutional network that learned to play Atari from raw pixels. OpenAI Five is an agent: five networks that learned Dota 2 teamwork through self-play. Claude is an agent: a language model that learned to reason and act from the breadth of human knowledge.
+A human is an agent: a biological neural network shaped by evolution. DeepMind's DQN is an agent: a convolutional network that learned to play Atari from raw pixels. Five-model self-play systems are agents: networks that learned complex teamwork through self-play. Modern language models are agents: they learn to reason and act from the breadth of human knowledge.
 
 In every case, the agent is the trained model. Not the game engine. Not the Dota 2 client. Not the terminal. The model.
 

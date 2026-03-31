@@ -4,15 +4,15 @@
     {
       "id": "tool-result-injection",
       "title": "Skills Inject via tool_result, Not System Prompt",
-      "description": "When the agent invokes the Skill tool, the skill's content (a SKILL.md file) is returned as a tool_result in a user message, not injected into the system prompt. This is a deliberate caching optimization: the system prompt remains static across turns, which means API providers can cache it (Anthropic's prompt caching, OpenAI's system message caching). If skill content were in the system prompt, it would change every time a new skill is loaded, invalidating the cache. By putting dynamic content in tool_result, we keep the expensive system prompt cacheable while still getting skill knowledge into context.",
+      "description": "When the agent invokes the Skill tool, the skill's content (a SKILL.md file) is returned as a tool_result in a user message, not injected into the system prompt. This is a deliberate caching optimization: the system prompt remains static across turns, which allows provider-side caching. If skill content were in the system prompt, it would change every time a new skill is loaded, invalidating the cache. By putting dynamic content in tool_result, we keep the expensive system prompt cacheable while still getting skill knowledge into context.",
       "alternatives": "Injecting skills into the system prompt is simpler and gives skills higher priority in the model's attention. But it breaks prompt caching (every skill load creates a new system prompt variant) and bloats the system prompt over time as skills accumulate. The tool_result approach keeps things cache-friendly at the cost of slightly lower attention priority.",
       "zh": {
         "title": "Skill 通过 tool_result 注入，而非系统提示词",
-        "description": "当 agent 调用 Skill 工具时，Skill 内容（SKILL.md 文件）作为 tool_result 在用户消息中返回，而非注入系统提示词。这是一个刻意的缓存优化：系统提示词在各轮次间保持静态，API 提供商可以缓存它（Anthropic 的 prompt caching、OpenAI 的 system message caching）。如果 Skill 内容在系统提示词中，每次加载新 Skill 都会使缓存失效。将动态内容放在 tool_result 中，既保持了昂贵的系统提示词可缓存，又让 Skill 知识进入了上下文。"
+        "description": "当 agent 调用 Skill 工具时，Skill 内容（SKILL.md 文件）作为 tool_result 在用户消息中返回，而非注入系统提示词。这是一个刻意的缓存优化：系统提示词在各轮次间保持静态，从而支持服务端缓存。如果 Skill 内容在系统提示词中，每次加载新 Skill 都会使缓存失效。将动态内容放在 tool_result 中，既保持了昂贵的系统提示词可缓存，又让 Skill 知识进入了上下文。"
       },
       "ja": {
         "title": "スキルはシステムプロンプトではなく tool_result で注入",
-        "description": "エージェントが Skill ツールを呼び出すと、スキルの内容（SKILL.md ファイル）はシステムプロンプトへの注入ではなく、ユーザーメッセージ内の tool_result として返されます。これは意図的なキャッシュ最適化です：システムプロンプトはターン間で静的に保たれるため、API プロバイダーがキャッシュできます（Anthropic のプロンプトキャッシュ、OpenAI のシステムメッセージキャッシュ）。スキル内容がシステムプロンプト内にあると、新しいスキルをロードするたびにキャッシュが無効化されます。動的コンテンツを tool_result に配置することで、高コストなシステムプロンプトのキャッシュ可能性を維持しつつ、スキル知識をコンテキストに取り込めます。"
+        "description": "エージェントが Skill ツールを呼び出すと、スキルの内容（SKILL.md ファイル）はシステムプロンプトへの注入ではなく、ユーザーメッセージ内の tool_result として返されます。これは意図的なキャッシュ最適化です：システムプロンプトはターン間で静的に保たれるため、プロバイダー側キャッシュを活用できます。スキル内容がシステムプロンプト内にあると、新しいスキルをロードするたびにキャッシュが無効化されます。動的コンテンツを tool_result に配置することで、高コストなシステムプロンプトのキャッシュ可能性を維持しつつ、スキル知識をコンテキストに取り込めます。"
       }
     },
     {

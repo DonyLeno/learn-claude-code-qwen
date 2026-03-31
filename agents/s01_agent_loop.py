@@ -46,11 +46,9 @@ load_dotenv(override=True)
 
 QWEN_API_KEY = (
     os.getenv("QWEN_API_KEY")
-    or os.getenv("OPENAI_API_KEY")
 )
 QWEN_BASE_URL = (
     os.getenv("QWEN_BASE_URL")
-    or os.getenv("OPENAI_BASE_URL")
     or "https://dashscope.aliyuncs.com/compatible-mode/v1"
 )
 MODEL = os.getenv("MODEL_ID", "qwen3.5-plus")
@@ -87,7 +85,7 @@ def run_bash(command: str) -> str:
 # -- The core pattern: a while loop that calls tools until the model stops --
 def qwen_chat(messages: list) -> dict:
     if not QWEN_API_KEY:
-        raise RuntimeError("Missing QWEN_API_KEY/DASHSCOPE_API_KEY/OPENAI_API_KEY")
+        raise RuntimeError("Missing QWEN_API_KEY")
     url = f"{QWEN_BASE_URL.rstrip('/')}/chat/completions"
     payload = {
         "model": MODEL,

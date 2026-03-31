@@ -6,21 +6,16 @@ import urllib.request
 from types import SimpleNamespace
 
 
-class Anthropic:
+class QwenClient:
     def __init__(self, api_key=None, base_url=None):
         self.api_key = (
             api_key
             or os.getenv("QWEN_API_KEY")
-            or os.getenv("DASHSCOPE_API_KEY")
-            or os.getenv("OPENAI_API_KEY")
-            or os.getenv("ANTHROPIC_API_KEY")
             or ""
         )
         self.base_url = (
             base_url
             or os.getenv("QWEN_BASE_URL")
-            or os.getenv("OPENAI_BASE_URL")
-            or os.getenv("ANTHROPIC_BASE_URL")
             or "https://dashscope.aliyuncs.com/compatible-mode/v1"
         ).rstrip("/")
         self.messages = _MessagesAPI(self)
@@ -31,15 +26,15 @@ class _MessagesAPI:
         self.outer = outer
 
     def create(self, model, messages, system=None, tools=None, max_tokens=8000, **kwargs):
-        openai_messages = _to_openai_messages(system=system, messages=messages)
-        openai_tools = _to_openai_tools(tools or [])
+        chat_messages = _to_chat_messages(system=system, messages=messages)
+        chat_tools = _to_chat_tools(tools or [])
         payload = {
             "model": model,
-            "messages": openai_messages,
+            "messages": chat_messages,
             "max_tokens": max_tokens,
         }
-        if openai_tools:
-            payload["tools"] = openai_tools
+        if chat_tools:
+            payload["tools"] = chat_tools
             payload["tool_choice"] = "auto"
         for k in ("temperature", "top_p", "stream"):
             if k in kwargs:
@@ -82,7 +77,7 @@ class _MessagesAPI:
         return SimpleNamespace(content=content_blocks, stop_reason=stop_reason, raw=data)
 
 
-def _to_openai_tools(tools):
+def _to_chat_tools(tools):
     result = []
     for t in tools:
         if not isinstance(t, dict):
@@ -103,7 +98,7 @@ def _to_openai_tools(tools):
     return result
 
 
-def _tool_result_to_openai_messages(parts):
+def _tool_result_to_chat_messages(parts):
     out = []
     for p in parts:
         if not isinstance(p, dict):
@@ -159,7 +154,7 @@ def _assistant_blocks_to_message(content):
     return msg
 
 
-def _to_openai_messages(system, messages):
+def _to_chat_messages(system, messages):
     out = []
     if system:
         out.append({"role": "system", "content": str(system)})
@@ -173,7 +168,7 @@ def _to_openai_messages(system, messages):
             out.append(_assistant_blocks_to_message(content))
             continue
         if role == "user" and isinstance(content, list):
-            out.extend(_tool_result_to_openai_messages(content))
+            out.extend(_tool_result_to_chat_messages(content))
             continue
         out.append({"role": role, "content": str(content)})
     return out
