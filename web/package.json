@@ -6,6 +6,8 @@
     "extract": "tsx scripts/extract-content.ts",
     "predev": "npm run extract",
     "dev": "next dev",
+    "gotty:build": "cd .. && mkdir -p bin && cd third_party/gotty && go build -o ../../bin/gotty .",
+    "gotty:start": "cd .. && ./bin/gotty --address 127.0.0.1 --port 8080 --permit-write --reconnect env HISTFILE=/tmp/.gotty_zsh_history /bin/zsh",
     "prebuild": "npm run extract",
     "build": "next build",
     "start": "next start"
